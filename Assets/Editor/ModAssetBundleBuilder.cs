@@ -5,6 +5,12 @@ using UnityEngine;
 public class ModAssetBundleBuilder
 {
     private const string outputDirectoryRoot = "Assets/AssetBundles";
+    private static BuildTarget[] supportedTargets = new BuildTarget[]
+    {
+        BuildTarget.StandaloneWindows64,
+        //BuildTarget.StandaloneOSX,
+        //BuildTarget.StandaloneLinux64
+    };
 
     [MenuItem("Assets/Build Compressed Asset Bundle (LZ4)")]
     public static void BuildBundles()
@@ -35,11 +41,13 @@ public class ModAssetBundleBuilder
         Debug.Log("Building asset bundle.");
 
         // Build the asset bundles with LZ4 compression.
-        BuildPipeline.BuildAssetBundles(
-            outputDirectoryRoot,
-            BuildAssetBundleOptions.ChunkBasedCompression,
-            BuildTarget.StandaloneWindows64
-        );
+        foreach (var target in supportedTargets) {
+            BuildPipeline.BuildAssetBundles(
+                outputDirectoryRoot,
+                BuildAssetBundleOptions.ChunkBasedCompression,
+                target
+            );
+        }
 
         Debug.Log("Asset bundles built successfully.");
     }
