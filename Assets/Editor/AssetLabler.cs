@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using UnityEditor;
 using UnityEngine;
 
@@ -23,7 +24,7 @@ public class AssetLabeler
 
         importer.textureType = TextureImporterType.Default;
         importer.SaveAndReimport();
-        Debug.Log($"Converted {assetPath} from Sprite to Default.");
+        Console.WriteLine($"Converted {assetPath} from Sprite to Default.");
     }
 
     /// <summary>
@@ -34,7 +35,7 @@ public class AssetLabeler
     {
         if (!Directory.Exists(assetsFolder))
         {
-            Debug.LogError($"Folder not found: {assetsFolder}");
+            Console.WriteLine($"[Error] Folder not found: {assetsFolder}");
             return 0;
         }
 
@@ -53,7 +54,7 @@ public class AssetLabeler
             if (extension != ".png" && extension != ".jpeg" && extension != ".jpg" && extension != ".psd" &&
                 extension != ".wav" && extension != ".mp3" && extension != ".ogg" && extension != ".shader")
             {
-                Debug.LogWarning("Skipped asset, wrong format: " + filePath);
+                Console.WriteLine("[Warning] Skipped asset, wrong format: " + filePath);
                 continue;
             }
 
@@ -61,22 +62,16 @@ public class AssetLabeler
             var isAudio = extension is ".wav" or ".mp3" or ".ogg";
 
             // Confirm that the asset is located under the Assets folder.
-            if (!assetPath.StartsWith("Assets"))
-            {
-                continue;
-            }
+            if (!assetPath.StartsWith("Assets")) continue;
 
-            if (isTexture)
-            {
-                // Convert Sprite textures to Default to avoid additional sprite sub-assets.
-                ConvertSpriteToDefault(assetPath);
-            }
+            // Convert Sprite textures to Default to avoid additional sprite sub-assets.
+            if (isTexture) ConvertSpriteToDefault(assetPath);
             
             // Set a common asset bundle name for every texture.
             var importer = AssetImporter.GetAtPath(assetPath);
             if (importer is null)
             {
-                Debug.LogWarning($"Could not get importer for: {assetPath}");
+                Console.WriteLine($"[Warning] Could not get importer for: {assetPath}");
                 continue;
             }
             importer.assetBundleName = assetFileName;
@@ -112,10 +107,10 @@ public class AssetLabeler
 
             importer.SaveAndReimport();
             assetsLabeled++;
-            Debug.Log($"Labeled asset: {assetPath} as {assetFileName}");
+            Console.WriteLine($"Labeled asset: {assetPath} as {assetFileName}");
         }
 
-        Debug.Log($"Labeling complete: {assetsLabeled} assets labeled with \"{assetFileName}\".");
+        Console.WriteLine($"Labeling complete: {assetsLabeled} assets labeled with \"{assetFileName}\".");
         return assetsLabeled;
     }
 

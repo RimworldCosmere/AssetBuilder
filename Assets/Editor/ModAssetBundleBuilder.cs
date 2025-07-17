@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
+using System.Linq;
 
 public class ModAssetBundleBuilder
 {
@@ -19,22 +20,34 @@ public class ModAssetBundleBuilder
     {
         var arguments = Environment.GetCommandLineArgs();
         var assetBundleName = "assetBundle";
+        var outputLocation = outputDirectoryRoot;
+        var buildTarget = "windows";
         foreach (var arg in arguments)
         {
-            if (!arg.StartsWith("--assetBundleName="))
+            if (arg.StartsWith("--assetBundleName="))
             {
-                continue;
+                assetBundleName = arg.Substring("--assetBundleName=".Length);
+                Debug.Log($"Using asset bundle name: {assetBundleName}");
             }
 
-            assetBundleName = arg.Substring("--assetBundleName=".Length);
-            Debug.Log($"Using asset bundle name: {assetBundleName}");
+            if (arg.StartsWith("--outputLocation"))
+            {
+                outputLocation = arg.Substring("--outputLocation=".Length);
+                Debug.Log($"Using output location: {outputLocation}");
+            }
+
+            if (arg.StartsWith("--buildTarget"))
+            {
+                buildTarget = arg.Substring("--buildTarget=".Length);
+                Debug.Log($"Using build location: {buildTarget}");
+            }
         }
 
         // Ensure textures are labeled correctly before proceeding.
         var count = AssetLabeler.LabelAllAssetsWithCommonName(assetBundleName);
         if (count == 0)
         {
-            Debug.LogError("No assets were labeled; aborting asset bundle build.");
+            Debug.Log("[Error] No assets were labeled; aborting asset bundle build.");
             return;
         }
 
@@ -43,41 +56,43 @@ public class ModAssetBundleBuilder
         Debug.Log("Building asset bundle.");
 
         // Build the asset bundles with LZ4 compression.
-        foreach (var target in supportedTargets)
+        foreach (var target in supportedTargets.Where(t => t.Key == buildTarget).ToList())
         {
-            string targetOutputDir = $"{outputDirectoryRoot}/{target.Key}";
-            if (!System.IO.Directory.Exists(targetOutputDir))
-            {
-                System.IO.Directory.CreateDirectory(targetOutputDir);
-            }
+            if (!Directory.Exists(outputDirectoryRoot)) Directory.CreateDirectory(outputDirectoryRoot);
 
             // Build the bundle
             BuildPipeline.BuildAssetBundles(
-                targetOutputDir,
+                outputDirectoryRoot,
                 BuildAssetBundleOptions.ChunkBasedCompression,
                 target.Value
             );
 
+            File.Delete(Path.Combine(outputDirectoryRoot, target.Key));
+            File.Delete(Path.Combine(outputDirectoryRoot, target.Key + ".manifest"));
+
             // Rename bundle and manifest
-            string sourceBundlePath = System.IO.Path.Combine(targetOutputDir, assetBundleName);
+            string sourceBundlePath = Path.Combine(outputDirectoryRoot, assetBundleName);
             string sourceManifestPath = sourceBundlePath + ".manifest";
-            string renamedBundlePath = System.IO.Path.Combine(targetOutputDir, $"{assetBundleName}_{target.Key}");
+
+            string bundleName = assetBundleName.ToLowerInvariant().Replace('.', '_').Replace("cryptiklemur", "resource") + $"_{target.Key}";
+            string renamedBundlePath = Path.Combine(outputDirectoryRoot, bundleName);
             string renamedManifestPath = renamedBundlePath + ".manifest";
 
+            if (Directory.Exists(outputLocation)) Directory.Delete(outputLocation, true);
+            if (!Directory.Exists(outputLocation)) Directory.CreateDirectory(outputLocation);
             if (File.Exists(sourceBundlePath))
             {
-                if (File.Exists(renamedBundlePath)) {
-                    File.Delete(renamedBundlePath);
-                }
+                if (File.Exists(renamedBundlePath)) File.Delete(renamedBundlePath);
                 File.Move(sourceBundlePath, renamedBundlePath);
+                File.Copy(renamedBundlePath, Path.Combine(outputLocation, bundleName), true);
             }
             if (File.Exists(sourceManifestPath))
             {
-                if (File.Exists(renamedManifestPath)) {
-                    File.Delete(renamedManifestPath);
-                }
+                if (File.Exists(renamedManifestPath)) File.Delete(renamedManifestPath);
                 File.Move(sourceManifestPath, renamedManifestPath);
+                File.Copy(renamedManifestPath, Path.Combine(outputLocation, bundleName + ".manifest"), true);
             }
+
         }
 
         Debug.Log("Asset bundles built successfully.");
