@@ -32,14 +32,18 @@ public class ModAssetBundleBuilder
 
             if (arg.StartsWith("--outputLocation"))
             {
-                outputLocation = arg.Substring("--outputLocation=".Length);
+                outputLocation = arg.Substring("--outputLocation=".Length).Replace('\\', Path.DirectorySeparatorChar);
+                if (!outputLocation.StartsWith("/"))
+                {
+                    outputLocation = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), outputLocation));
+                }
                 Debug.Log($"Using output location: {outputLocation}");
             }
 
             if (arg.StartsWith("--buildTarget"))
             {
                 buildTarget = arg.Substring("--buildTarget=".Length);
-                Debug.Log($"Using build location: {buildTarget}");
+                Debug.Log($"Using build target: {buildTarget}");
             }
         }
 
