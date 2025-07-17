@@ -1,15 +1,17 @@
+using System.Collections.Generic;
 using System;
+using System.IO;
 using UnityEditor;
 using UnityEngine;
 
 public class ModAssetBundleBuilder
 {
     private const string outputDirectoryRoot = "Assets/AssetBundles";
-    private static BuildTarget[] supportedTargets = new BuildTarget[]
+    private static Dictionary<string, BuildTarget> supportedTargets = new Dictionary<string, BuildTarget>()
     {
-        BuildTarget.StandaloneWindows64,
-        //BuildTarget.StandaloneOSX,
-        //BuildTarget.StandaloneLinux64
+        { "windows", BuildTarget.StandaloneWindows64},
+        { "mac", BuildTarget.StandaloneOSX},
+        { "linux", BuildTarget.StandaloneLinux64},
     };
 
     [MenuItem("Assets/Build Compressed Asset Bundle (LZ4)")]
@@ -41,12 +43,41 @@ public class ModAssetBundleBuilder
         Debug.Log("Building asset bundle.");
 
         // Build the asset bundles with LZ4 compression.
-        foreach (var target in supportedTargets) {
+        foreach (var target in supportedTargets)
+        {
+            string targetOutputDir = $"{outputDirectoryRoot}/{target.Key}";
+            if (!System.IO.Directory.Exists(targetOutputDir))
+            {
+                System.IO.Directory.CreateDirectory(targetOutputDir);
+            }
+
+            // Build the bundle
             BuildPipeline.BuildAssetBundles(
-                outputDirectoryRoot,
+                targetOutputDir,
                 BuildAssetBundleOptions.ChunkBasedCompression,
-                target
+                target.Value
             );
+
+            // Rename bundle and manifest
+            string sourceBundlePath = System.IO.Path.Combine(targetOutputDir, assetBundleName);
+            string sourceManifestPath = sourceBundlePath + ".manifest";
+            string renamedBundlePath = System.IO.Path.Combine(targetOutputDir, $"{assetBundleName}_{target.Key}");
+            string renamedManifestPath = renamedBundlePath + ".manifest";
+
+            if (File.Exists(sourceBundlePath))
+            {
+                if (File.Exists(renamedBundlePath)) {
+                    File.Delete(renamedBundlePath);
+                }
+                File.Move(sourceBundlePath, renamedBundlePath);
+            }
+            if (File.Exists(sourceManifestPath))
+            {
+                if (File.Exists(renamedManifestPath)) {
+                    File.Delete(renamedManifestPath);
+                }
+                File.Move(sourceManifestPath, renamedManifestPath);
+            }
         }
 
         Debug.Log("Asset bundles built successfully.");
