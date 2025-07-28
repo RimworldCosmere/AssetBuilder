@@ -78,7 +78,7 @@ public class ModAssetBundleBuilder
             string sourceBundlePath = Path.Combine(outputDirectoryRoot, assetBundleName);
             string sourceManifestPath = sourceBundlePath + ".manifest";
 
-            string bundleName = assetBundleName.ToLowerInvariant().Replace('.', '_').Replace("cryptiklemur", "resource") + $"_{target.Key}";
+            string bundleName = assetBundleName.ToLowerInvariant().Replace('.', '_') + $"resource_{target.Key}";
             string renamedBundlePath = Path.Combine(outputDirectoryRoot, bundleName);
             string renamedManifestPath = renamedBundlePath + ".manifest";
 
