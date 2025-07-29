@@ -96,8 +96,8 @@ public class ModAssetBundleBuilder
 
             File.Delete(Path.Combine(outputLocation, "AssetBundles"));
             File.Delete(Path.Combine(outputLocation, "AssetBundles.manifest"));
-            File.Move(Path.Combine(outputLocation, assetBundleName), Path.Combine(outputLocation, $"resources_{assetBundleName.Replace(".", "_")}_{target.Key}"));
-            File.Move(Path.Combine(outputLocation, assetBundleName + ".manifest"), Path.Combine(outputLocation, $"resources_{assetBundleName.Replace(".", "_")}_{target.Key}.manifest"));
+            File.Move(Path.Combine(outputLocation, assetBundleName), Path.Combine(outputLocation, $"resource_{assetBundleName.Replace(".", "_")}_{target.Key}"));
+            File.Move(Path.Combine(outputLocation, assetBundleName + ".manifest"), Path.Combine(outputLocation, $"resource_{assetBundleName.Replace(".", "_")}_{target.Key}.manifest"));
             /*
                         File.Delete(Path.Combine(outputDirectoryRoot, target.Key));
                         File.Delete(Path.Combine(outputDirectoryRoot, target.Key + ".manifest"));
