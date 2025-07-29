@@ -4,6 +4,7 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 using System.Linq;
+using System.Xml.Linq;
 
 public class ModAssetBundleBuilder
 {
@@ -18,87 +19,125 @@ public class ModAssetBundleBuilder
     [MenuItem("Assets/Build Compressed Asset Bundle (LZ4)")]
     public static void BuildBundles()
     {
+        Debug.Log($"Starting AssetBundle Builder");
         var arguments = Environment.GetCommandLineArgs();
-        var assetBundleName = "assetBundle";
-        var outputLocation = outputDirectoryRoot;
-        var buildTarget = "windows";
+        var sourceDirectory = "";
+        var buildTarget = "all";
         foreach (var arg in arguments)
         {
-            if (arg.StartsWith("--assetBundleName="))
+            if (arg.StartsWith("-buildTarget="))
             {
-                assetBundleName = arg.Substring("--assetBundleName=".Length);
-                Debug.Log($"Using asset bundle name: {assetBundleName}");
-            }
-
-            if (arg.StartsWith("--outputLocation"))
-            {
-                outputLocation = arg.Substring("--outputLocation=".Length).Replace('\\', Path.DirectorySeparatorChar);
-                if (!outputLocation.StartsWith("/"))
-                {
-                    outputLocation = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), outputLocation));
-                }
-                Debug.Log($"Using output location: {outputLocation}");
-            }
-
-            if (arg.StartsWith("--buildTarget"))
-            {
-                buildTarget = arg.Substring("--buildTarget=".Length);
+                buildTarget = arg.Substring("-buildTarget=".Length);
                 Debug.Log($"Using build target: {buildTarget}");
             }
+
+            if (arg.StartsWith("-source="))
+            {
+                sourceDirectory = arg.Substring("-source=".Length);
+                if (!sourceDirectory.StartsWith("/"))
+                {
+                    sourceDirectory = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), sourceDirectory));
+                }
+                Debug.Log($"Using source directory: {sourceDirectory}");
+            }
+        }
+
+        if (string.IsNullOrEmpty(sourceDirectory))
+        {
+            throw new Exception("Source directory must be set with -source=.");
+        }
+
+        if (!Directory.Exists(Path.Combine(sourceDirectory, "About")))
+        {
+            throw new Exception($"{sourceDirectory} doesn't look like a valid mod. Missing About directory");
+        }
+
+        var assetBundleName = LoadPackageId(sourceDirectory);
+        if (string.IsNullOrEmpty(assetBundleName))
+        {
+            throw new Exception("Failed to find packageId. Is one set in your About/About.xml?");
+        }
+
+        var expectedPath = Path.Combine(Directory.GetCurrentDirectory(), "Assets", "Data", assetBundleName);
+        if (!Directory.Exists(expectedPath)) {
+            throw new Exception($"Expected assets in {expectedPath}. See the readme.");
         }
 
         // Ensure textures are labeled correctly before proceeding.
-        var count = AssetLabeler.LabelAllAssetsWithCommonName(assetBundleName);
-        if (count == 0)
-        {
-            Debug.Log("[Error] No assets were labeled; aborting asset bundle build.");
-            return;
+        var bundle = AssetLabeler.LabelAllAssetsWithCommonName(assetBundleName);
+        if (bundle.assetNames == null || bundle.assetNames.Count() == 0) {
+            throw new Exception("No assets were labeled; aborting asset bundle build.");
         }
+
+        var outputLocation = Path.Combine(sourceDirectory, "AssetBundles");
 
         // Since the bundle only includes generic assets like textures or sounds
         // and not platform-specific assets, we can build for all platforms.
-        Debug.Log("Building asset bundle.");
+        Debug.Log($"Building asset bundle in {outputLocation}.");
 
         // Build the asset bundles with LZ4 compression.
-        foreach (var target in supportedTargets.Where(t => t.Key == buildTarget).ToList())
+        var targets = buildTarget == "all" ? supportedTargets : supportedTargets.Where(t => t.Key == buildTarget);
+        foreach (var target in targets)
         {
-            if (!Directory.Exists(outputDirectoryRoot)) Directory.CreateDirectory(outputDirectoryRoot);
-
-            // Build the bundle
-            BuildPipeline.BuildAssetBundles(
-                outputDirectoryRoot,
-                BuildAssetBundleOptions.ChunkBasedCompression,
-                target.Value
-            );
-
-            File.Delete(Path.Combine(outputDirectoryRoot, target.Key));
-            File.Delete(Path.Combine(outputDirectoryRoot, target.Key + ".manifest"));
-
-            // Rename bundle and manifest
-            string sourceBundlePath = Path.Combine(outputDirectoryRoot, assetBundleName);
-            string sourceManifestPath = sourceBundlePath + ".manifest";
-
-            string bundleName = assetBundleName.ToLowerInvariant().Replace('.', '_') + $"resource_{target.Key}";
-            string renamedBundlePath = Path.Combine(outputDirectoryRoot, bundleName);
-            string renamedManifestPath = renamedBundlePath + ".manifest";
-
             if (Directory.Exists(outputLocation)) Directory.Delete(outputLocation, true);
             if (!Directory.Exists(outputLocation)) Directory.CreateDirectory(outputLocation);
-            if (File.Exists(sourceBundlePath))
-            {
-                if (File.Exists(renamedBundlePath)) File.Delete(renamedBundlePath);
-                File.Move(sourceBundlePath, renamedBundlePath);
-                File.Copy(renamedBundlePath, Path.Combine(outputLocation, bundleName), true);
-            }
-            if (File.Exists(sourceManifestPath))
-            {
-                if (File.Exists(renamedManifestPath)) File.Delete(renamedManifestPath);
-                File.Move(sourceManifestPath, renamedManifestPath);
-                File.Copy(renamedManifestPath, Path.Combine(outputLocation, bundleName + ".manifest"), true);
-            }
 
+            // Build the bundle
+            var bundles = new AssetBundleBuild[1];
+            bundles[0] = bundle;
+
+            var manifest = BuildPipeline.BuildAssetBundles(new BuildAssetBundlesParameters
+            {
+                outputPath = outputLocation,
+                options = BuildAssetBundleOptions.ChunkBasedCompression | BuildAssetBundleOptions.AssetBundleStripUnityVersion,
+                bundleDefinitions = bundles,
+                targetPlatform = target.Value
+            });
+
+            File.Delete(Path.Combine(outputLocation, "AssetBundles"));
+            File.Delete(Path.Combine(outputLocation, "AssetBundles.manifest"));
+            File.Move(Path.Combine(outputLocation, assetBundleName), Path.Combine(outputLocation, $"resources_{assetBundleName.Replace(".", "_")}_{target.Key}"));
+            File.Move(Path.Combine(outputLocation, assetBundleName + ".manifest"), Path.Combine(outputLocation, $"resources_{assetBundleName.Replace(".", "_")}_{target.Key}.manifest"));
+            /*
+                        File.Delete(Path.Combine(outputDirectoryRoot, target.Key));
+                        File.Delete(Path.Combine(outputDirectoryRoot, target.Key + ".manifest"));
+
+                        // Rename bundle and manifest
+                        string sourceBundlePath = Path.Combine(outputDirectoryRoot, assetBundleName);
+                        string sourceManifestPath = sourceBundlePath + ".manifest";
+
+                        string bundleName = assetBundleName.ToLowerInvariant().Replace('.', '_') + $"resource_{target.Key}";
+                        string renamedBundlePath = Path.Combine(outputDirectoryRoot, bundleName);
+                        string renamedManifestPath = renamedBundlePath + ".manifest";
+
+                        if (Directory.Exists(outputLocation)) Directory.Delete(outputLocation, true);
+                        if (!Directory.Exists(outputLocation)) Directory.CreateDirectory(outputLocation);
+                        if (File.Exists(sourceBundlePath))
+                        {
+                            if (File.Exists(renamedBundlePath)) File.Delete(renamedBundlePath);
+                            File.Move(sourceBundlePath, renamedBundlePath);
+                            File.Copy(renamedBundlePath, Path.Combine(outputLocation, bundleName), true);
+                        }
+                        if (File.Exists(sourceManifestPath))
+                        {
+                            if (File.Exists(renamedManifestPath)) File.Delete(renamedManifestPath);
+                            File.Move(sourceManifestPath, renamedManifestPath);
+                            File.Copy(renamedManifestPath, Path.Combine(outputLocation, bundleName + ".manifest"), true);
+                        }
+            */
         }
 
         Debug.Log("Asset bundles built successfully.");
+    }
+
+    private static string LoadPackageId(string sourceDirectory)
+    {
+        FileStream fs = new FileStream(Path.Combine(sourceDirectory, "About", "About.xml"), FileMode.Open, FileAccess.Read);
+        var doc = XDocument.Load(fs);
+        if (doc.Root == null) return "";
+        var packageId = doc.Root.Element("packageId");
+        if (packageId == null || packageId.Value == null) return "";
+
+        return packageId.Value.ToLower();
     }
 }

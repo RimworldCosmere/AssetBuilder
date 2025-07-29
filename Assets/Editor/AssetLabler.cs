@@ -1,11 +1,11 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
 
 public class AssetLabeler
 {
-    // The folder that holds your mod textures.
     private static readonly string assetsFolder = "Assets/Data";
 
     /// <summary>
@@ -31,22 +31,20 @@ public class AssetLabeler
     ///     Labels all assets  with a single common asset bundle name.
     /// </summary>
     /// <returns>The number of textures labeled.</returns>
-    public static int LabelAllAssetsWithCommonName(string assetFileName)
+    public static AssetBundleBuild LabelAllAssetsWithCommonName(string assetFileName)
     {
-        if (!Directory.Exists(assetsFolder))
-        {
-            Console.WriteLine($"[Error] Folder not found: {assetsFolder}");
-            return 0;
-        }
+        var sourceDirectory = Path.Combine(assetsFolder, assetFileName);
+        Debug.Log($"Finding all assets in {sourceDirectory}");
 
         // Get all the files under modTexturesFolder (and its subdirectories).
-        var filePaths = Directory.GetFiles(assetsFolder, "*.*", SearchOption.AllDirectories);
+        var filePaths = Directory.GetFiles(sourceDirectory, "*.*", SearchOption.AllDirectories);
         var assetsLabeled = 0;
 
+        var files = new List<string>();
         foreach (var filePath in filePaths)
         {
             // Normalize the path format.
-            var assetPath = filePath.Replace("\\", "/");
+            var assetPath = $"Assets/Data/{assetFileName}" + filePath.Replace(sourceDirectory, "").Replace("\\", "/");
             var extension = Path.GetExtension(assetPath).ToLower();
             if (extension == "") extension = ".shader";
 
@@ -54,7 +52,7 @@ public class AssetLabeler
             if (extension != ".png" && extension != ".jpeg" && extension != ".jpg" && extension != ".psd" &&
                 extension != ".wav" && extension != ".mp3" && extension != ".ogg" && extension != ".shader")
             {
-                Console.WriteLine("[Warning] Skipped asset, wrong format: " + filePath);
+                // Console.WriteLine("[Warning] Skipped asset, wrong format: " + filePath);
                 continue;
             }
 
@@ -66,28 +64,43 @@ public class AssetLabeler
 
             // Convert Sprite textures to Default to avoid additional sprite sub-assets.
             if (isTexture) ConvertSpriteToDefault(assetPath);
-            
+
             // Set a common asset bundle name for every texture.
             var importer = AssetImporter.GetAtPath(assetPath);
-            if (importer is null)
+            if (importer == null)
             {
-                Console.WriteLine($"[Warning] Could not get importer for: {assetPath}");
+                Debug.LogError($"[Warning] Could not get importer for: {assetPath}");
                 continue;
             }
             importer.assetBundleName = assetFileName;
 
             if (isTexture && importer is TextureImporter textureImporter)
             {
+                bool isTerrain = assetPath.ToLower().Contains("/terrain/");
+
                 textureImporter.alphaIsTransparency = true;
+                textureImporter.alphaSource = TextureImporterAlphaSource.FromInput;
+
                 // Check if the path has terrain in it, if so, set the wrap mode to Repeat.
-                textureImporter.wrapMode = assetPath.ToLower().Contains("/terrain/")
-                    ? TextureWrapMode.Repeat
-                    : TextureWrapMode.Clamp;
+                textureImporter.wrapMode = isTerrain ? TextureWrapMode.Repeat : TextureWrapMode.Clamp;
+                textureImporter.anisoLevel = isTerrain ? 8 : 1;
+
 
                 textureImporter.textureType = TextureImporterType.Default;
                 textureImporter.filterMode = FilterMode.Trilinear;
                 textureImporter.mipmapEnabled = true;
                 textureImporter.mipmapFilter = TextureImporterMipFilter.KaiserFilter;
+                textureImporter.sRGBTexture = !assetPath.ToLower().Contains("_mask") && !assetPath.ToLower().Contains("_normal");
+                if (assetPath.ToLower().Contains("_normal")) textureImporter.textureType = TextureImporterType.NormalMap;
+
+                textureImporter.SetPlatformTextureSettings(new TextureImporterPlatformSettings
+                {
+                    name = "Standalone",
+                    overridden = true,
+                    format = TextureImporterFormat.BC7,
+                    maxTextureSize = 4096,
+                    textureCompression = TextureImporterCompression.CompressedHQ
+                });
             }
             else if (isAudio && importer is AudioImporter audioImporter)
             {
@@ -107,17 +120,11 @@ public class AssetLabeler
 
             importer.SaveAndReimport();
             assetsLabeled++;
-            Console.WriteLine($"Labeled asset: {assetPath} as {assetFileName}");
+            files.Add(assetPath);
+            //Console.WriteLine($"Labeled asset: {assetPath} as {assetFileName}");
         }
 
-        Console.WriteLine($"Labeling complete: {assetsLabeled} assets labeled with \"{assetFileName}\".");
-        return assetsLabeled;
-    }
-
-    // For manual testing from the Editor.
-    [MenuItem("Assets/Label All Assets")]
-    public static void Menu_LabelAllTexturesWithCommonName()
-    {
-        LabelAllAssetsWithCommonName("DefaultAssetBundleName");
+        Debug.Log($"Labeling complete: {assetsLabeled} assets labeled with \"{assetFileName}\".");
+        return new AssetBundleBuild { assetBundleName = assetFileName, assetNames = files.ToArray() };
     }
 }
