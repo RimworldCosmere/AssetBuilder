@@ -98,33 +98,6 @@ public class ModAssetBundleBuilder
             File.Delete(Path.Combine(outputLocation, "AssetBundles.manifest"));
             File.Move(Path.Combine(outputLocation, assetBundleName), Path.Combine(outputLocation, $"resource_{assetBundleName.Replace(".", "_")}_{target.Key}"));
             File.Move(Path.Combine(outputLocation, assetBundleName + ".manifest"), Path.Combine(outputLocation, $"resource_{assetBundleName.Replace(".", "_")}_{target.Key}.manifest"));
-            /*
-                        File.Delete(Path.Combine(outputDirectoryRoot, target.Key));
-                        File.Delete(Path.Combine(outputDirectoryRoot, target.Key + ".manifest"));
-
-                        // Rename bundle and manifest
-                        string sourceBundlePath = Path.Combine(outputDirectoryRoot, assetBundleName);
-                        string sourceManifestPath = sourceBundlePath + ".manifest";
-
-                        string bundleName = assetBundleName.ToLowerInvariant().Replace('.', '_') + $"resource_{target.Key}";
-                        string renamedBundlePath = Path.Combine(outputDirectoryRoot, bundleName);
-                        string renamedManifestPath = renamedBundlePath + ".manifest";
-
-                        if (Directory.Exists(outputLocation)) Directory.Delete(outputLocation, true);
-                        if (!Directory.Exists(outputLocation)) Directory.CreateDirectory(outputLocation);
-                        if (File.Exists(sourceBundlePath))
-                        {
-                            if (File.Exists(renamedBundlePath)) File.Delete(renamedBundlePath);
-                            File.Move(sourceBundlePath, renamedBundlePath);
-                            File.Copy(renamedBundlePath, Path.Combine(outputLocation, bundleName), true);
-                        }
-                        if (File.Exists(sourceManifestPath))
-                        {
-                            if (File.Exists(renamedManifestPath)) File.Delete(renamedManifestPath);
-                            File.Move(sourceManifestPath, renamedManifestPath);
-                            File.Copy(renamedManifestPath, Path.Combine(outputLocation, bundleName + ".manifest"), true);
-                        }
-            */
         }
 
         Debug.Log("Asset bundles built successfully.");

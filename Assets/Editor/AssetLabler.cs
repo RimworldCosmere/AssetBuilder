@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEditor;
+using UnityEditor.U2D.PSD;
 using UnityEngine;
 
 public class AssetLabeler
 {
-    private static readonly string assetsFolder = "Assets/Data";
+    private static readonly string assetsFolder = "Assets\\Data";
 
     /// <summary>
     ///     Converts a texture asset from Sprite to Default to prevent Unity from generating sprite sub-assets.
@@ -43,8 +45,18 @@ public class AssetLabeler
         var files = new List<string>();
         foreach (var filePath in filePaths)
         {
-            // Normalize the path format.
             var assetPath = $"Assets/Data/{assetFileName}" + filePath.Replace(sourceDirectory, "").Replace("\\", "/");
+           
+            // Skip if meta file already exists
+            var metaPath = assetPath + ".meta";
+            if (File.Exists(metaPath))
+            {
+                assetsLabeled++;
+                files.Add(assetPath);
+                continue; // Already imported/configured — leave it alone
+            }
+            
+            // Normalize the path format.
             var extension = Path.GetExtension(assetPath).ToLower();
             if (extension == "") extension = ".shader";
 
@@ -57,6 +69,7 @@ public class AssetLabeler
             }
 
             var isTexture = extension is ".png" or ".jpeg" or ".jpg" or ".psd";
+            var isPSD = extension is ".psd";
             var isAudio = extension is ".wav" or ".mp3" or ".ogg";
 
             // Confirm that the asset is located under the Assets folder.
@@ -64,6 +77,7 @@ public class AssetLabeler
 
             // Convert Sprite textures to Default to avoid additional sprite sub-assets.
             if (isTexture) ConvertSpriteToDefault(assetPath);
+            if (isPSD) PSDMatteUtility.EnsureSettingsForFile(assetPath);
 
             // Set a common asset bundle name for every texture.
             var importer = AssetImporter.GetAtPath(assetPath);
@@ -78,6 +92,7 @@ public class AssetLabeler
             {
                 bool isTerrain = assetPath.ToLower().Contains("/terrain/");
 
+                textureImporter.textureType = TextureImporterType.GUI;
                 textureImporter.alphaIsTransparency = true;
                 textureImporter.alphaSource = TextureImporterAlphaSource.FromInput;
 
@@ -85,8 +100,6 @@ public class AssetLabeler
                 textureImporter.wrapMode = isTerrain ? TextureWrapMode.Repeat : TextureWrapMode.Clamp;
                 textureImporter.anisoLevel = isTerrain ? 8 : 1;
 
-
-                textureImporter.textureType = TextureImporterType.Default;
                 textureImporter.filterMode = FilterMode.Trilinear;
                 textureImporter.mipmapEnabled = true;
                 textureImporter.mipmapFilter = TextureImporterMipFilter.KaiserFilter;
