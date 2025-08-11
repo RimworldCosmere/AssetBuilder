@@ -89,7 +89,7 @@ public class ModAssetBundleBuilder
             var manifest = BuildPipeline.BuildAssetBundles(new BuildAssetBundlesParameters
             {
                 outputPath = outputLocation,
-                options = BuildAssetBundleOptions.ChunkBasedCompression | BuildAssetBundleOptions.AssetBundleStripUnityVersion,
+                options = BuildAssetBundleOptions.ChunkBasedCompression,
                 bundleDefinitions = bundles,
                 targetPlatform = target.Value
             });
