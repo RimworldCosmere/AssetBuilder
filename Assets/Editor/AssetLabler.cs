@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,7 +8,7 @@ using UnityEngine;
 
 public class AssetLabeler
 {
-    private static readonly string assetsFolder = "Assets\\Data";
+    private static readonly string assetsFolder = Path.Combine("Assets", "Data");
 
     /// <summary>
     ///     Converts a texture asset from Sprite to Default to prevent Unity from generating sprite sub-assets.
@@ -37,6 +37,15 @@ public class AssetLabeler
     {
         var sourceDirectory = Path.Combine(assetsFolder, assetFileName);
         Debug.Log($"Finding all assets in {sourceDirectory}");
+        
+        // Ensure the directory exists before trying to enumerate files
+        if (!Directory.Exists(sourceDirectory))
+        {
+            Debug.LogError($"Directory does not exist: {sourceDirectory}");
+            Debug.LogError($"Current working directory: {Directory.GetCurrentDirectory()}");
+            Debug.LogError($"Assets folder: {assetsFolder}");
+            throw new DirectoryNotFoundException($"Could not find directory: {sourceDirectory}");
+        }
 
         // Get all the files under modTexturesFolder (and its subdirectories).
         var filePaths = Directory.GetFiles(sourceDirectory, "*.*", SearchOption.AllDirectories);
@@ -45,7 +54,8 @@ public class AssetLabeler
         var files = new List<string>();
         foreach (var filePath in filePaths)
         {
-            var assetPath = $"Assets/Data/{assetFileName}" + filePath.Replace(sourceDirectory, "").Replace("\\", "/");
+            var relativePath = Path.GetRelativePath(sourceDirectory, filePath);
+            var assetPath = Path.Combine("Assets", "Data", assetFileName, relativePath).Replace('\\', '/');
            
             // Skip if meta file already exists
             var metaPath = assetPath + ".meta";

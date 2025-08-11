@@ -108,3 +108,8 @@ $RECYCLE.BIN/
 
 .vscode/launch.json
 .vscode/extensions.json
+
+.claude
+.idea
+.vscode
+*.xsd
